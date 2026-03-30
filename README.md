@@ -13,7 +13,7 @@
 
 ## 🗺️ Live Map
 
-**[View the interactive map →](...)**
+**[View the interactive map →](https://nuvnce.github.io/togo-soil-classification/)**
 
 Each of the 599 cantons is clickable and shows:
 - Dominant WRB soil type
