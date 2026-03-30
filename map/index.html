@@ -1,0 +1,434 @@
+<!doctype html>
+<html lang="fr">
+    <head>
+        <meta charset="utf-8">
+        <meta http-equiv="X-UA-Compatible" content="IE=edge">
+        <meta name="viewport" content="initial-scale=1,user-scalable=no,maximum-scale=1,width=device-width">
+        <meta name="mobile-web-app-capable" content="yes">
+        <meta name="apple-mobile-web-app-capable" content="yes">
+        <link rel="stylesheet" href="css/leaflet.css">
+        <link rel="stylesheet" href="css/L.Control.Layers.Tree.css">
+        <link rel="stylesheet" href="css/qgis2web.css">
+        <link rel="stylesheet" href="css/fontawesome-all.min.css">
+        <link rel="preconnect" href="https://fonts.googleapis.com">
+        <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600&family=Source+Sans+3:wght@400;600&display=swap" rel="stylesheet">
+        <title>Carte des Sols Agricoles du Togo</title>
+        <style>
+        * { box-sizing: border-box; }
+        html, body, #map {
+            width: 100%;
+            height: 100%;
+            padding: 0;
+            margin: 0;
+            font-family: 'Source Sans 3', sans-serif;
+        }
+
+        /* ── HEADER ── */
+        #header {
+            position: absolute;
+            top: 0; left: 0; right: 0;
+            z-index: 1000;
+            background: linear-gradient(135deg, #1a3a2a 0%, #2d5a3d 60%, #1a3a2a 100%);
+            color: #fff;
+            padding: 10px 20px;
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            box-shadow: 0 2px 12px rgba(0,0,0,0.35);
+        }
+        #header .icon {
+            font-size: 28px;
+            opacity: 0.9;
+        }
+        #header h1 {
+            font-family: 'Playfair Display', serif;
+            font-size: 18px;
+            margin: 0;
+            letter-spacing: 0.3px;
+            line-height: 1.2;
+        }
+        #header p {
+            margin: 2px 0 0;
+            font-size: 11px;
+            opacity: 0.7;
+            letter-spacing: 0.5px;
+            text-transform: uppercase;
+        }
+        #header .badge {
+            margin-left: auto;
+            background: rgba(255,255,255,0.15);
+            border: 1px solid rgba(255,255,255,0.25);
+            border-radius: 20px;
+            padding: 4px 12px;
+            font-size: 11px;
+            white-space: nowrap;
+        }
+
+        /* map below header */
+        #map { padding-top: 58px; }
+
+        /* ── SEARCH ── */
+        #search-container {
+            position: absolute;
+            top: 68px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 999;
+            width: 280px;
+        }
+        #search-input {
+            width: 100%;
+            padding: 8px 14px 8px 36px;
+            border-radius: 24px;
+            border: none;
+            background: rgba(255,255,255,0.95);
+            box-shadow: 0 2px 10px rgba(0,0,0,0.2);
+            font-family: 'Source Sans 3', sans-serif;
+            font-size: 13px;
+            outline: none;
+        }
+        #search-icon {
+            position: absolute;
+            left: 12px;
+            top: 50%;
+            transform: translateY(-50%);
+            color: #666;
+            font-size: 13px;
+            pointer-events: none;
+        }
+        #search-results {
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 4px 16px rgba(0,0,0,0.15);
+            max-height: 200px;
+            overflow-y: auto;
+            margin-top: 4px;
+            display: none;
+        }
+        .search-item {
+            padding: 8px 14px;
+            cursor: pointer;
+            font-size: 13px;
+            border-bottom: 1px solid #f0f0f0;
+            transition: background 0.15s;
+        }
+        .search-item:hover { background: #f5f9f5; }
+        .search-item .canton-name { font-weight: 600; color: #1a3a2a; }
+        .search-item .canton-info { font-size: 11px; color: #888; }
+
+        /* ── LEGEND ── */
+        #legend {
+            position: absolute;
+            bottom: 30px;
+            right: 10px;
+            z-index: 999;
+            background: rgba(255,255,255,0.96);
+            border-radius: 10px;
+            padding: 14px 16px;
+            box-shadow: 0 3px 16px rgba(0,0,0,0.18);
+            min-width: 190px;
+            border: 1px solid rgba(0,0,0,0.06);
+        }
+        #legend h3 {
+            margin: 0 0 10px;
+            font-family: 'Playfair Display', serif;
+            font-size: 13px;
+            color: #1a3a2a;
+            border-bottom: 2px solid #2d5a3d;
+            padding-bottom: 6px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 6px;
+            font-size: 12px;
+            color: #333;
+            cursor: pointer;
+            transition: opacity 0.2s;
+        }
+        .legend-item:hover { opacity: 0.7; }
+        .legend-color {
+            width: 16px;
+            height: 16px;
+            border-radius: 3px;
+            border: 1px solid rgba(0,0,0,0.15);
+            flex-shrink: 0;
+        }
+
+        /* ── STATS BADGE ── */
+        #stats {
+            position: absolute;
+            bottom: 30px;
+            left: 10px;
+            z-index: 999;
+            background: rgba(26,58,42,0.92);
+            color: white;
+            border-radius: 10px;
+            padding: 10px 14px;
+            font-size: 11px;
+            box-shadow: 0 3px 12px rgba(0,0,0,0.2);
+            line-height: 1.8;
+        }
+        #stats strong { font-size: 18px; display: block; font-family: 'Playfair Display', serif; }
+
+        /* ── POPUP ── */
+        .leaflet-popup-content-wrapper {
+            border-radius: 10px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.2);
+            padding: 0;
+            overflow: hidden;
+            font-family: 'Source Sans 3', sans-serif;
+        }
+        .leaflet-popup-content {
+            margin: 0;
+            width: 240px !important;
+        }
+        .popup-header {
+            background: linear-gradient(135deg, #1a3a2a, #2d5a3d);
+            color: white;
+            padding: 10px 14px;
+        }
+        .popup-canton {
+            font-family: 'Playfair Display', serif;
+            font-size: 15px;
+            font-weight: 600;
+        }
+        .popup-location {
+            font-size: 11px;
+            opacity: 0.8;
+            margin-top: 2px;
+        }
+        .popup-body {
+            padding: 10px 14px;
+        }
+        .popup-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            padding: 5px 0;
+            border-bottom: 1px solid #f0f0f0;
+            font-size: 12px;
+            gap: 8px;
+        }
+        .popup-row:last-child { border-bottom: none; }
+        .popup-label {
+            color: #888;
+            text-transform: uppercase;
+            font-size: 10px;
+            letter-spacing: 0.5px;
+            font-weight: 600;
+            white-space: nowrap;
+            padding-top: 1px;
+        }
+        .popup-value { color: #222; text-align: right; font-size: 12px; }
+        .popup-badge {
+            display: inline-block;
+            padding: 2px 8px;
+            border-radius: 12px;
+            font-size: 11px;
+            font-weight: 600;
+        }
+        .badge-tres-favorable { background: #d4edda; color: #155724; }
+        .badge-favorable { background: #d1ecf1; color: #0c5460; }
+        .badge-moyen { background: #fff3cd; color: #856404; }
+        .badge-conditionnel { background: #fde8d4; color: #7d3c0c; }
+        .badge-tres-faible { background: #f8d7da; color: #721c24; }
+        </style>
+    </head>
+    <body>
+
+        <!-- HEADER -->
+        <div id="header">
+            <div class="icon">🌱</div>
+            <div>
+                <h1>Carte des Sols Agricoles du Togo</h1>
+                <p>Classification WRB · SoilGrids · 599 cantons</p>
+            </div>
+            <div class="badge">📍 Togo · 2024</div>
+        </div>
+
+        <!-- SEARCH -->
+        <div id="search-container">
+            <span id="search-icon">🔍</span>
+            <input type="text" id="search-input" placeholder="Rechercher un canton...">
+            <div id="search-results"></div>
+        </div>
+
+        <!-- MAP -->
+        <div id="map"></div>
+
+        <!-- LEGEND -->
+        <div id="legend">
+            <h3>Types de sols</h3>
+            <div class="legend-item"><div class="legend-color" style="background:#E07B39"></div>Acrisols</div>
+            <div class="legend-item"><div class="legend-color" style="background:#F5DEB3"></div>Arenosols</div>
+            <div class="legend-item"><div class="legend-color" style="background:#C8A97E"></div>Cambisols</div>
+            <div class="legend-item"><div class="legend-color" style="background:#5BA08A"></div>Fluvisols</div>
+            <div class="legend-item"><div class="legend-color" style="background:#7BAFD4"></div>Gleysols</div>
+            <div class="legend-item"><div class="legend-color" style="background:#D4845A"></div>Lixisols</div>
+            <div class="legend-item"><div class="legend-color" style="background:#B8860B"></div>Luvisols</div>
+            <div class="legend-item"><div class="legend-color" style="background:#4A7C59"></div>Nitisols</div>
+            <div class="legend-item"><div class="legend-color" style="background:#708090"></div>Vertisols</div>
+        </div>
+
+        <!-- STATS -->
+        <div id="stats">
+            <strong>599</strong> cantons cartographiés<br>
+            <strong>9</strong> types de sols WRB
+        </div>
+
+        <script src="js/qgis2web_expressions.js"></script>
+        <script src="js/leaflet.js"></script>
+        <script src="js/L.Control.Layers.Tree.min.js"></script>
+        <script src="js/leaflet.rotatedMarker.js"></script>
+        <script src="js/leaflet.pattern.js"></script>
+        <script src="js/leaflet-hash.js"></script>
+        <script src="js/Autolinker.min.js"></script>
+        <script src="js/rbush.min.js"></script>
+        <script src="js/labelgun.min.js"></script>
+        <script src="js/labels.js"></script>
+        <script src="data/cantons_togo_sols_0.js"></script>
+
+        <script>
+        var map = L.map('map', {
+            zoomControl: false, maxZoom: 28, minZoom: 1
+        }).fitBounds([[4.24, -0.15],[11.14, 1.81]]);
+
+        var hash = new L.Hash(map);
+        map.attributionControl.setPrefix('<a href="https://github.com/tomchadwin/qgis2web" target="_blank">qgis2web</a> &middot; <a href="https://leafletjs.com">Leaflet</a> &middot; <a href="https://qgis.org">QGIS</a> &middot; Données: SoilGrids/ISRIC');
+
+        var zoomControl = L.control.zoom({ position: 'topleft' }).addTo(map);
+
+        // ── POPUP BUILDER ──
+        function getFavorabilityClass(val) {
+            if (!val) return '';
+            var v = val.toLowerCase();
+            if (v.includes('très favorable')) return 'badge-tres-favorable';
+            if (v.includes('favorable')) return 'badge-favorable';
+            if (v.includes('conditionnel')) return 'badge-conditionnel';
+            if (v.includes('moyen')) return 'badge-moyen';
+            if (v.includes('très faible') || v.includes('faible')) return 'badge-tres-faible';
+            return '';
+        }
+
+        function buildPopup(feature) {
+            var p = feature.properties;
+            var fav = p['favorable'] || '';
+            var favClass = getFavorabilityClass(fav);
+            return '<div class="popup-header">' +
+                '<div class="popup-canton">' + (p['CANTON'] || '—') + '</div>' +
+                '<div class="popup-location">📍 ' + (p['PREFECTURE'] || '') + ' · ' + (p['REGION'] || '') + '</div>' +
+                '</div>' +
+                '<div class="popup-body">' +
+                '<div class="popup-row"><span class="popup-label">Type de sol</span><span class="popup-value"><strong>' + (p['sol'] || '—') + '</strong></span></div>' +
+                '<div class="popup-row"><span class="popup-label">Fertilité</span><span class="popup-value"><span class="popup-badge ' + favClass + '">' + (fav || '—') + '</span></span></div>' +
+                '<div class="popup-row"><span class="popup-label">Cultures</span><span class="popup-value">' + (p['cultures'] || '—') + '</span></div>' +
+                '<div class="popup-row"><span class="popup-label">Contrainte</span><span class="popup-value">' + (p['contrainte'] || '—') + '</span></div>' +
+                '</div>';
+        }
+
+        // ── STYLE ──
+        var soilColors = {
+            'Acrisols':  '#E07B39',
+            'Arenosols': '#F5DEB3',
+            'Cambisols': '#C8A97E',
+            'Fluvisols': '#5BA08A',
+            'Gleysols':  '#7BAFD4',
+            'Lixisols':  '#D4845A',
+            'Luvisols':  '#B8860B',
+            'Nitisols':  '#4A7C59',
+            'Vertisols': '#708090'
+        };
+
+        function style_cantons(feature) {
+            var sol = feature.properties['sol'];
+            var color = soilColors[sol] || '#cccccc';
+            return {
+                pane: 'pane_cantons_togo_sols_0',
+                opacity: 1,
+                color: 'rgba(35,35,35,0.6)',
+                dashArray: '',
+                lineCap: 'butt',
+                lineJoin: 'miter',
+                weight: 0.6,
+                fill: true,
+                fillOpacity: 0.85,
+                fillColor: color,
+                interactive: true,
+            };
+        }
+
+        map.createPane('pane_cantons_togo_sols_0');
+        map.getPane('pane_cantons_togo_sols_0').style.zIndex = 400;
+
+        var allLayers = [];
+
+        var layer_cantons = new L.geoJson(json_cantons_togo_sols_0, {
+            interactive: true,
+            pane: 'pane_cantons_togo_sols_0',
+            style: style_cantons,
+            onEachFeature: function(feature, layer) {
+                var content = buildPopup(feature);
+                layer.bindPopup(content, { maxHeight: 400 });
+
+                // hover highlight
+                layer.on('mouseover', function() {
+                    layer.setStyle({ weight: 2, color: '#fff', fillOpacity: 1 });
+                    layer.bringToFront();
+                });
+                layer.on('mouseout', function() {
+                    layer_cantons.resetStyle(layer);
+                });
+
+                allLayers.push({ layer: layer, feature: feature });
+            }
+        });
+
+        layer_cantons.addTo(map);
+
+        // ── SEARCH ──
+        var searchInput = document.getElementById('search-input');
+        var searchResults = document.getElementById('search-results');
+
+        searchInput.addEventListener('input', function() {
+            var query = this.value.trim().toLowerCase();
+            searchResults.innerHTML = '';
+            if (query.length < 2) { searchResults.style.display = 'none'; return; }
+
+            var matches = allLayers.filter(function(item) {
+                var canton = (item.feature.properties['CANTON'] || '').toLowerCase();
+                var pref = (item.feature.properties['PREFECTURE'] || '').toLowerCase();
+                return canton.includes(query) || pref.includes(query);
+            }).slice(0, 8);
+
+            if (matches.length === 0) { searchResults.style.display = 'none'; return; }
+
+            matches.forEach(function(item) {
+                var p = item.feature.properties;
+                var div = document.createElement('div');
+                div.className = 'search-item';
+                div.innerHTML = '<div class="canton-name">' + (p['CANTON'] || '') + '</div>' +
+                                '<div class="canton-info">' + (p['PREFECTURE'] || '') + ' · ' + (p['sol'] || '') + '</div>';
+                div.addEventListener('click', function() {
+                    var bounds = item.layer.getBounds();
+                    map.fitBounds(bounds, { maxZoom: 12 });
+                    item.layer.openPopup();
+                    searchResults.style.display = 'none';
+                    searchInput.value = p['CANTON'];
+                });
+                searchResults.appendChild(div);
+            });
+            searchResults.style.display = 'block';
+        });
+
+        document.addEventListener('click', function(e) {
+            if (!document.getElementById('search-container').contains(e.target)) {
+                searchResults.style.display = 'none';
+            }
+        });
+        </script>
+    </body>
+</html>
